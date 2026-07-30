@@ -23,14 +23,17 @@ export const GITHUB_CONTRIBUTORS = ['Arc-Jung', 'corgi93'];
  * 4. enabled 를 true 로 바꾼다.
  */
 export const GISCUS = {
-	enabled: false,
-	repo: 'healsy/healsy-blog', // 예: 'healsy/healsy-blog'
-	repoId: '', // giscus.app 이 알려주는 값
-	category: 'Comments',
-	categoryId: '', // giscus.app 이 알려주는 값
+	enabled: true,
+	repo: 'healsy-team/healsy-blog',
+	repoId: 'R_kgDOToCwQw',
+	category: 'Announcements',
+	categoryId: 'DIC_kwDOToCwQ84DCS7m',
 	mapping: 'pathname',
 	reactionsEnabled: '1',
-	// 다크 브랜드 톤에 맞는 테마
-	theme: 'dark_dimmed',
+	// 시스템(라이트/다크) 설정을 따름
+	theme: 'preferred_color_scheme',
 	lang: 'ko',
 } as const;
+
+// ⚠️ 댓글이 실제로 뜨려면 giscus 앱 설치가 필요:
+//    https://github.com/apps/giscus → healsy-team/healsy-blog 에 설치
