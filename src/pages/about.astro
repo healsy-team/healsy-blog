@@ -1,0 +1,292 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import Ambient from '../components/Ambient.astro';
+import {
+	SITE_TITLE,
+	WALTERWALKER_URL,
+	SIDAS_STORE_URL,
+	REPORT_URL,
+	WANTED_URL,
+	GITHUB_CONTRIBUTORS,
+} from '../consts';
+
+// 빌드 시 GitHub API 로 기여자 프로필을 가져온다. 실패하면 최소 정보로 폴백.
+async function fetchContributor(login: string) {
+	try {
+		const res = await fetch(`https://api.github.com/users/${login}`, {
+			headers: { 'User-Agent': 'healsy-blog', Accept: 'application/vnd.github+json' },
+		});
+		if (!res.ok) throw new Error(`${res.status}`);
+		const d = await res.json();
+		return {
+			login: d.login as string,
+			name: (d.name || d.login) as string,
+			bio: d.bio as string | null,
+			location: d.location as string | null,
+			avatar: d.avatar_url as string,
+			url: d.html_url as string,
+			repos: d.public_repos as number,
+			followers: d.followers as number,
+		};
+	} catch {
+		return {
+			login,
+			name: login,
+			bio: null,
+			location: null,
+			avatar: `https://github.com/${login}.png`,
+			url: `https://github.com/${login}`,
+			repos: null,
+			followers: null,
+		};
+	}
+}
+const contributors = await Promise.all(GITHUB_CONTRIBUTORS.map(fetchContributor));
+---
+
+<!doctype html>
+<html lang="ko">
+	<head>
+		<BaseHead title="About" description="월터워커가 만드는 발 건강 플랫폼 Healsy, 그 개발팀 이야기" />
+	</head>
+	<body>
+		<Ambient />
+		<Header />
+		<main>
+			<h1>About</h1>
+			<p class="lead">
+				Healsy Engineering 은 <strong>월터워커</strong>의 제품 개발팀이에요.
+				발 건강을 AI 와 소프트웨어로 풀어가는 헬스케어 플랫폼 <strong>Healsy</strong> 를 만듭니다.
+			</p>
+
+			<h2>월터워커 &amp; 시다스</h2>
+			<p>
+				<strong>월터워커(Walter Walker)</strong> 는 프랑스 프리미엄 인솔 브랜드
+				<strong>시다스(Sidas)</strong> 의 한국 공식 수입원이에요.
+				시다스는 1975년부터 이어온 발 건강 전문 글로벌 No.1 인솔 브랜드입니다.
+			</p>
+			<ul class="facts">
+				<li>50개국 1.5만 개 매장에서 유통, 매일 150만 명이 사용</li>
+				<li>5개 국제 어워드와 15건의 특허로 쌓은 자체 테크놀로지</li>
+				<li>맨시티 · 리버풀 선수들이 착용</li>
+				<li>국내 SSG 랜더스 · 수원 삼성 블루윙즈 · LX 사이클팀 지정 인솔</li>
+			</ul>
+			<p>
+				월터워커는 온라인 자사몰과 함께 전국 11개 직영 매장을 운영하며 확장하고 있어요.
+			</p>
+			<ul class="stores">
+				<li><a href="https://map.kakao.com/?q=시다스 일원" target="_blank" rel="noopener noreferrer">일원점 <span>서울 강남</span></a></li>
+				<li><a href="https://map.kakao.com/?q=시다스 논현" target="_blank" rel="noopener noreferrer">논현점 <span>서울 강남</span></a></li>
+				<li><a href="https://map.kakao.com/?q=시다스 더현대서울" target="_blank" rel="noopener noreferrer">여의도점 <span>더현대 서울</span></a></li>
+				<li><a href="https://map.kakao.com/?q=시다스 현대백화점 판교" target="_blank" rel="noopener noreferrer">판교점 <span>현대백화점 판교</span></a></li>
+				<li><a href="https://map.kakao.com/?q=시다스 스페이스원" target="_blank" rel="noopener noreferrer">남양주점 <span>현대프리미엄아울렛 스페이스원</span></a></li>
+				<li><a href="https://map.kakao.com/?q=시다스 현대아울렛 송도" target="_blank" rel="noopener noreferrer">송도점 <span>현대프리미엄아울렛 송도</span></a></li>
+				<li><a href="https://map.kakao.com/?q=시다스 스타필드 고양" target="_blank" rel="noopener noreferrer">고양점 <span>스타필드 고양</span></a></li>
+				<li><a href="https://map.kakao.com/?q=시다스 스타필드 수원" target="_blank" rel="noopener noreferrer">수원점 <span>스타필드 수원</span></a></li>
+				<li><a href="https://map.kakao.com/?q=시다스 스타필드 하남" target="_blank" rel="noopener noreferrer">하남점 <span>스타필드 하남</span></a></li>
+				<li><a href="https://map.kakao.com/?q=시다스 스타필드 파주 운정" target="_blank" rel="noopener noreferrer">운정점 <span>스타필드 파주 운정</span></a></li>
+				<li><a href="https://map.kakao.com/?q=시다스 스타필드 안성" target="_blank" rel="noopener noreferrer">안성점 <span>스타필드 안성</span></a></li>
+			</ul>
+			<p>
+				그리고 그 위에, 발을 측정하고 분석해 꼭 맞는 인솔을 찾아주는
+				<strong>Healsy</strong> 플랫폼을 소프트웨어로 만들고 있습니다.
+			</p>
+
+			<h2>우리가 푸는 문제</h2>
+			<p>발 측정과 인솔 상담은 원래 사람의 경험에 기대는 일이었어요.</p>
+			<p>
+				저희는 이걸 소프트웨어로 옮기고 있어요.<br />
+				족저압 센서로 발을 읽고, 카메라로 자세를 봅니다.<br />
+				그 데이터로 사람마다 다른 발을 일관된 기준으로 분석해<br />
+				맞는 인솔과 운동, 신발을 추천합니다.
+			</p>
+			<p>"아날로그였던 발 상담을 어떻게 소프트웨어로 바꿀까?" 저희의 큰 질문이에요.</p>
+
+			<h2>우리가 일하는 방식</h2>
+			<p>큰 팀이 아니에요.</p>
+			<p>
+				그래서 AI 를 개발에 적극적으로 끌어들여 생산성을 높입니다.<br />
+				사람은 그 결과를 검수하고 방향을 잡는 데 집중해요.
+			</p>
+			<p><strong>AI 가 빠르게 만들고, 사람이 하네스로 감싸 꼼꼼히 검증합니다.</strong></p>
+
+			<h2>우리가 다루는 기술</h2>
+			<ul>
+				<li><strong>Frontend</strong> — Next.js · React · TypeScript 리포트 웹</li>
+				<li><strong>Backend</strong> — 서버리스 API · 측정 데이터 파이프라인 · 추천 로직</li>
+				<li><strong>Mobile</strong> — Kotlin · Jetpack Compose 키오스크, CameraX · 센서 연동</li>
+				<li><strong>Desktop</strong> — Electron 기반 데스크톱 앱</li>
+				<li><strong>AI / Domain</strong> — 족저압·자세 분석, 발 분류, AI 를 끼운 개발 플로우</li>
+			</ul>
+
+			<h2>Contributors</h2>
+			<p>이 블로그를 만들고 운영하는 사람들.</p>
+			<div class="contributors">
+				{
+					contributors.map((c) => (
+						<a class="contributor" href={c.url} target="_blank" rel="noopener noreferrer">
+							<img class="avatar" src={c.avatar} alt={c.name} width="60" height="60" loading="lazy" />
+							<div class="meta">
+								<div class="name">{c.name}</div>
+								<div class="login">@{c.login}</div>
+								{c.bio && <p class="bio">{c.bio}</p>}
+								<div class="stats">
+									{c.location && <span>{c.location}</span>}
+									{c.repos != null && <span>{c.repos} repos</span>}
+									{c.followers != null && <span>{c.followers} followers</span>}
+								</div>
+							</div>
+						</a>
+					))
+				}
+			</div>
+
+			<h2>함께 일해요</h2>
+			<p>
+				발 건강을 소프트웨어로 푸는 일에 함께할 <strong>Walter Walker Crew</strong> 를 찾고 있어요.
+				Your Foot Company, Healsy 를 같이 만들 분이라면
+				<a href={WANTED_URL} target="_blank" rel="noopener noreferrer">채용 공고</a>를 확인해 주세요.
+			</p>
+
+			<h2>링크</h2>
+			<ul class="links">
+				<li><a href={WALTERWALKER_URL} target="_blank" rel="noopener noreferrer">월터워커 (walterwalker.kr) &rarr;</a></li>
+				<li><a href={SIDAS_STORE_URL} target="_blank" rel="noopener noreferrer">Sidas 인솔 스토어 (월터워커) &rarr;</a></li>
+				<li><a href={REPORT_URL} target="_blank" rel="noopener noreferrer">측정 리포트 (report.healsy.io) &rarr;</a></li>
+				<li><a href={WANTED_URL} target="_blank" rel="noopener noreferrer">채용 공고 (Wanted) &rarr;</a></li>
+			</ul>
+		</main>
+		<Footer />
+	</body>
+</html>
+
+<style>
+	main {
+		padding-top: 2.5em;
+	}
+	.lead {
+		font-size: 1.15em;
+		color: rgb(var(--gray));
+	}
+	h2 {
+		font-size: 1.6rem;
+		margin-top: 1.8em;
+	}
+	ul {
+		padding-left: 1.2em;
+	}
+	li {
+		margin-bottom: 0.4em;
+	}
+	.facts {
+		color: rgb(var(--gray));
+	}
+	.facts li {
+		margin-bottom: 0.5em;
+	}
+	.stores {
+		list-style: none;
+		padding-left: 0;
+		margin: 1.2em 0;
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 0 1.6em;
+	}
+	.stores li {
+		margin: 0;
+		border-bottom: 1px solid var(--outline);
+	}
+	.stores li a {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 0.6em;
+		padding: 0.55em 0;
+		font-size: 0.95rem;
+		text-decoration: none;
+		color: inherit;
+		transition: color 0.15s ease;
+	}
+	.stores li a:hover,
+	.stores li a:hover span {
+		color: var(--brand);
+	}
+	.stores li span {
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: rgb(var(--gray));
+		text-align: right;
+		white-space: nowrap;
+	}
+	@media (max-width: 640px) {
+		.stores {
+			grid-template-columns: 1fr;
+			gap: 0;
+		}
+	}
+	.contributors {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+		gap: 1em;
+		margin: 1.2em 0;
+	}
+	.contributor {
+		display: flex;
+		gap: 1em;
+		align-items: flex-start;
+		padding: 1.2em;
+		background: var(--surface);
+		border: 1px solid var(--outline);
+		border-radius: 12px;
+		text-decoration: none;
+		transition: border-color 0.15s ease;
+	}
+	.contributor:hover {
+		border-color: var(--brand);
+	}
+	.avatar {
+		width: 60px;
+		height: 60px;
+		border-radius: 50%;
+		flex-shrink: 0;
+		border: 1px solid var(--outline);
+	}
+	.meta {
+		min-width: 0;
+	}
+	.name {
+		color: rgb(var(--black));
+		font-weight: 600;
+		font-size: 1.05rem;
+	}
+	.login {
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		color: var(--brand);
+		margin-bottom: 0.5em;
+	}
+	.bio {
+		color: rgb(var(--gray));
+		font-size: 0.9rem;
+		margin: 0 0 0.6em;
+		line-height: 1.5;
+	}
+	.stats {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.9em;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: rgb(var(--gray));
+	}
+	.links {
+		list-style: none;
+		padding-left: 0;
+	}
+	.links a {
+		font-family: var(--font-mono);
+		font-size: 0.95rem;
+	}
+</style>

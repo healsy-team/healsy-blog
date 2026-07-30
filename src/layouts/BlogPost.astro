@@ -1,0 +1,162 @@
+---
+import { Image } from 'astro:assets';
+import type { CollectionEntry } from 'astro:content';
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import FormattedDate from '../components/FormattedDate.astro';
+import Header from '../components/Header.astro';
+import Giscus from '../components/Giscus.astro';
+
+type Props = CollectionEntry<'blog'>['data'];
+
+const { title, description, pubDate, updatedDate, heroImage, author, authorGithub } = Astro.props;
+
+// 작성자 GitHub 프로필 — authorGithub 가 있을 때만 빌드타임에 불러온다. 실패 시 최소 정보로 폴백.
+let authorProfile: { login: string; avatar: string; url: string } | null = null;
+if (authorGithub) {
+	try {
+		const res = await fetch(`https://api.github.com/users/${authorGithub}`, {
+			headers: { 'User-Agent': 'healsy-blog', Accept: 'application/vnd.github+json' },
+		});
+		if (!res.ok) throw new Error(`${res.status}`);
+		const d = await res.json();
+		authorProfile = { login: d.login, avatar: d.avatar_url, url: d.html_url };
+	} catch {
+		authorProfile = {
+			login: authorGithub,
+			avatar: `https://github.com/${authorGithub}.png`,
+			url: `https://github.com/${authorGithub}`,
+		};
+	}
+}
+---
+
+<html lang="ko">
+	<head>
+		<BaseHead
+			title={title}
+			description={description}
+			type="article"
+			publishedDate={pubDate}
+			author={author}
+		/>
+		<style>
+			main {
+				width: calc(100% - 2em);
+				max-width: 100%;
+				margin: 0;
+			}
+			.hero-image {
+				width: 100%;
+			}
+			.hero-image img {
+				display: block;
+				margin: 0 auto 2em;
+				width: 100%;
+				max-width: 1020px;
+				height: 400px;
+				object-fit: cover;
+				border-radius: 12px;
+				box-shadow: var(--box-shadow);
+			}
+			.prose {
+				width: 720px;
+				max-width: calc(100% - 2em);
+				margin: auto;
+				padding: 1em;
+				color: rgb(var(--gray-dark));
+			}
+			/* 글 헤더: 제목 → 작성자·날짜 → 구분선 (왼쪽 정렬) */
+			.post-header {
+				padding: 1em 0 0;
+				margin-bottom: 2.5em;
+			}
+			.post-header h1 {
+				margin: 0 0 0.6em;
+				font-size: 2.6em;
+				line-height: 1.2;
+			}
+			.post-meta {
+				display: flex;
+				align-items: center;
+				flex-wrap: wrap;
+				gap: 0.5em;
+				font-family: var(--font-mono);
+				font-size: 0.85rem;
+				color: rgb(var(--gray));
+			}
+			.post-meta .author {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.45em;
+				text-decoration: none;
+				color: rgb(var(--gray));
+				transition: color 0.15s ease;
+			}
+			.post-meta .author img {
+				width: 24px;
+				height: 24px;
+				border-radius: 50%;
+				border: 1px solid var(--outline);
+			}
+			.post-meta .author:hover {
+				color: var(--brand);
+			}
+			.post-meta .dot {
+				opacity: 0.5;
+			}
+			.post-meta .updated {
+				font-style: normal;
+				opacity: 0.8;
+			}
+			.post-header hr {
+				margin: 1.5em 0 0;
+			}
+		</style>
+	</head>
+
+	<body>
+		<Header />
+		<main>
+			<article>
+				<div class="hero-image">
+					{heroImage && <Image width={1020} src={heroImage} alt="" />}
+				</div>
+				<div class="prose">
+					<header class="post-header">
+						<h1>{title}</h1>
+						<div class="post-meta">
+							{
+								authorProfile && (
+									<a class="author" href={authorProfile.url} target="_blank" rel="noopener noreferrer">
+										<img src={authorProfile.avatar} alt={authorProfile.login} width="24" height="24" loading="lazy" />
+										<span>{authorProfile.login}</span>
+									</a>
+								)
+							}
+							{
+								author && (
+									<>
+										<span class="dot" aria-hidden="true">·</span>
+										<span class="part">{author}</span>
+									</>
+								)
+							}
+							<span class="dot" aria-hidden="true">·</span>
+							<FormattedDate date={pubDate} />
+							{
+								updatedDate && (
+									<span class="updated">(updated {' '}<FormattedDate date={updatedDate} />)</span>
+								)
+							}
+						</div>
+						<hr />
+					</header>
+					<slot />
+				</div>
+			</article>
+			<Giscus />
+		</main>
+		<Footer />
+	</body>
+</html>

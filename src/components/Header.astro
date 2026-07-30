@@ -1,0 +1,90 @@
+---
+import { SITE_TITLE } from '../consts';
+import HeaderLink from './HeaderLink.astro';
+import Logo from './Logo.astro';
+import ThemeToggle from './ThemeToggle.astro';
+---
+
+<header>
+	<nav>
+		<a href="/" class="brand" aria-label={SITE_TITLE}>
+			<Logo height={30} />
+			<span class="divider" aria-hidden="true"></span>
+			<span class="brand-suffix">Engineering</span>
+		</a>
+		<div class="internal-links">
+			<HeaderLink href="/">Home</HeaderLink>
+			<HeaderLink href="/blog">Blog</HeaderLink>
+			<HeaderLink href="/about">About</HeaderLink>
+			<ThemeToggle />
+		</div>
+	</nav>
+</header>
+<style>
+	header {
+		margin: 0;
+		padding: 0 1.5em;
+		background: var(--header-bg);
+		backdrop-filter: saturate(140%) blur(10px);
+		-webkit-backdrop-filter: saturate(140%) blur(10px);
+		border-bottom: 1px solid var(--outline);
+		position: sticky;
+		top: 0;
+		z-index: 20;
+	}
+	nav {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		max-width: 1100px;
+		margin: 0 auto;
+	}
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: 0.7em;
+		padding: 0.75em 0;
+		text-decoration: none;
+	}
+	.divider {
+		width: 1px;
+		height: 16px;
+		background: var(--outline);
+	}
+	.brand-suffix {
+		font-family: var(--font-brand);
+		color: rgb(var(--gray));
+		font-size: 0.9rem;
+		font-weight: 600;
+		letter-spacing: 0.01em;
+	}
+	.internal-links {
+		display: flex;
+		align-items: center;
+		gap: 0.25em;
+	}
+	nav a {
+		padding: 1em 0.6em;
+		color: rgb(var(--gray));
+		border-bottom: 3px solid transparent;
+		text-decoration: none;
+		font-size: 0.95rem;
+		transition: color 0.15s ease;
+	}
+	.internal-links a:hover {
+		color: rgb(var(--black));
+	}
+	nav a.active {
+		color: rgb(var(--black));
+		border-bottom-color: var(--brand);
+	}
+	@media (max-width: 720px) {
+		header {
+			padding: 0 1em;
+		}
+		.divider,
+		.brand-suffix {
+			display: none;
+		}
+	}
+</style>

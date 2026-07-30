@@ -1,0 +1,37 @@
+---
+import { WALTERWALKER_URL, REPORT_URL, WANTED_URL } from '../consts';
+const today = new Date();
+---
+
+<footer>
+	<div class="copyright">&copy; {today.getFullYear()} Healsy. All rights reserved.</div>
+	<div class="links">
+		<a href={WALTERWALKER_URL} target="_blank" rel="noopener noreferrer">월터워커</a>
+		<a href={REPORT_URL} target="_blank" rel="noopener noreferrer">Report</a>
+		<a href={WANTED_URL} target="_blank" rel="noopener noreferrer">채용</a>
+		<a href="/rss.xml">RSS</a>
+	</div>
+</footer>
+<style>
+	footer {
+		padding: 3em 1em 4em 1em;
+		background: var(--surface);
+		border-top: 1px solid var(--outline);
+		color: rgb(var(--gray));
+		text-align: center;
+		font-size: 0.9rem;
+	}
+	.links {
+		display: flex;
+		justify-content: center;
+		gap: 1.4em;
+		margin-top: 0.8em;
+	}
+	.links a {
+		text-decoration: none;
+		color: rgb(var(--gray));
+	}
+	.links a:hover {
+		color: var(--brand);
+	}
+</style>

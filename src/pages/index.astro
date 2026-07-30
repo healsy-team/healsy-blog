@@ -1,0 +1,201 @@
+---
+import { getCollection } from 'astro:content';
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import FormattedDate from '../components/FormattedDate.astro';
+import Ambient from '../components/Ambient.astro';
+import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+
+const rawPosts = (await getCollection('blog'))
+	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+	.slice(0, 4);
+
+const posts = await Promise.all(
+	rawPosts.map(async (post) => {
+		let profile: { login: string; avatar: string } | null = null;
+		const gh = post.data.authorGithub;
+		if (gh) {
+			try {
+				const res = await fetch(`https://api.github.com/users/${gh}`, {
+					headers: { 'User-Agent': 'healsy-blog', Accept: 'application/vnd.github+json' },
+				});
+				if (!res.ok) throw new Error(`${res.status}`);
+				const d = await res.json();
+				profile = { login: d.login, avatar: d.avatar_url };
+			} catch {
+				profile = { login: gh, avatar: `https://github.com/${gh}.png` };
+			}
+		}
+		return { post, profile };
+	}),
+);
+---
+
+<!doctype html>
+<html lang="ko">
+	<head>
+		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+	</head>
+	<body>
+		<Ambient />
+		<Header />
+		<main>
+			<section class="hero">
+				<img
+					class="hero-logo"
+					src="/assets/healsy-sidas-ci.png"
+					alt="Healsy with Sidas"
+					width="240"
+					height="55"
+				/>
+				<h1>깔창 한 켤레에도<br />기술이 들어갑니다</h1>
+				<p class="lead">
+					발을 재고 분석해 꼭 맞는 인솔을 찾습니다.<br />
+					저희는 이걸 AI 와 소프트웨어로 푸는 AX 팀이에요.<br />
+					깔창 회사가 기술로 어떤 문제를 푸는지<br />
+					그 이야기를 편하게 나눕니다.
+				</p>
+				<a class="cta" href="/blog">글 전체 보기 &rarr;</a>
+			</section>
+
+			<section class="recent">
+				<p class="section-title">최근 글</p>
+				<ul>
+					{
+						posts.map(({ post, profile }) => (
+							<li>
+								<a href={`/blog/${post.id}/`}>
+									<div class="meta">
+										<FormattedDate date={post.data.pubDate} />
+										{profile && (
+											<>
+												<span class="dot" aria-hidden="true">·</span>
+												<span class="author">
+													<img src={profile.avatar} alt={profile.login} width="18" height="18" loading="lazy" />
+													{profile.login}
+												</span>
+											</>
+										)}
+										{post.data.author && (
+											<>
+												<span class="dot" aria-hidden="true">·</span>
+												<span>{post.data.author}</span>
+											</>
+										)}
+									</div>
+									<h3 class="title">{post.data.title}</h3>
+								</a>
+							</li>
+						))
+					}
+				</ul>
+			</section>
+		</main>
+		<Footer />
+	</body>
+</html>
+
+<style>
+	.hero {
+		padding: 4.5em 0 4em;
+		border-bottom: 1px solid var(--outline);
+	}
+	.hero-logo {
+		height: 46px;
+		width: auto;
+		display: block;
+		margin-bottom: 1.4em;
+	}
+	:global(html[data-theme='dark']) .hero-logo {
+		/* 검정 CI 를 다크용으로: 검정→흰색, 오렌지는 hue-rotate 로 보존 */
+		filter: invert(1) hue-rotate(180deg);
+	}
+	.hero h1 {
+		font-size: 3.6em;
+		line-height: 1.05;
+		margin-bottom: 0.4em;
+	}
+	.lead {
+		color: rgb(var(--gray-dark));
+		font-size: 1.1em;
+		line-height: 1.5;
+		max-width: 33em;
+		margin-bottom: 1.8em;
+	}
+	.cta {
+		display: inline-block;
+		background: var(--brand);
+		color: #0f0f0f;
+		font-weight: 600;
+		text-decoration: none;
+		padding: 0.65em 1.4em;
+		border-radius: 999px;
+		transition:
+			transform 0.12s ease,
+			box-shadow 0.12s ease;
+	}
+	.cta:hover {
+		color: #0f0f0f;
+		transform: translateY(-1px);
+		box-shadow: 0 8px 24px var(--brand-glow);
+	}
+	.section-title {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		text-transform: uppercase;
+		letter-spacing: 0.18em;
+		color: rgb(var(--gray));
+		margin: 2.8em 0 0.6em;
+	}
+	.recent ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.recent li {
+		border-top: 1px solid var(--outline);
+	}
+	.recent li a {
+		display: block;
+		padding: 1.5em 0;
+		text-decoration: none;
+	}
+	.recent .meta {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: rgb(var(--gray));
+		margin-bottom: 0.5em;
+	}
+	.recent .author {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35em;
+	}
+	.recent .author img {
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		border: 1px solid var(--outline);
+	}
+	.recent .dot {
+		opacity: 0.5;
+	}
+	.recent .title {
+		color: rgb(var(--black));
+		font-size: 1.5rem;
+		margin: 0;
+		transition: color 0.15s ease;
+	}
+	.recent li a:hover .title {
+		color: var(--brand);
+	}
+	@media (max-width: 720px) {
+		.hero h1 {
+			font-size: 2.4em;
+		}
+	}
+</style>

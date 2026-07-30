@@ -1,0 +1,42 @@
+---
+// giscus 댓글 (GitHub Discussions 기반, 무료).
+// 설정값은 src/consts.ts 의 GISCUS 에서 관리한다. enabled=false 면 렌더링하지 않는다.
+import { GISCUS } from '../consts';
+---
+
+{
+	GISCUS.enabled && (
+		<section class="comments">
+			<h2>댓글</h2>
+			<script
+				src="https://giscus.app/client.js"
+				data-repo={GISCUS.repo}
+				data-repo-id={GISCUS.repoId}
+				data-category={GISCUS.category}
+				data-category-id={GISCUS.categoryId}
+				data-mapping={GISCUS.mapping}
+				data-reactions-enabled={GISCUS.reactionsEnabled}
+				data-emit-metadata="0"
+				data-input-position="top"
+				data-theme={GISCUS.theme}
+				data-lang={GISCUS.lang}
+				crossorigin="anonymous"
+				async
+			/>
+		</section>
+	)
+}
+
+<style>
+	.comments {
+		width: 720px;
+		max-width: calc(100% - 2em);
+		margin: 3em auto 0;
+		padding: 2em 1em 0;
+		border-top: 1px solid var(--outline);
+	}
+	.comments h2 {
+		font-size: 1.4em;
+		margin-bottom: 1em;
+	}
+</style>

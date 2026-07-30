@@ -1,0 +1,89 @@
+---
+// 페이지 상단(약 한 화면)에 은은하게 퍼지는 오렌지 글로우. 홈·About 등에서 재사용.
+---
+
+<div class="ambient" aria-hidden="true">
+	<div class="orb orb-a"></div>
+	<div class="orb orb-b"></div>
+	<div class="spot"></div>
+</div>
+<style>
+	.ambient {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100vh;
+		overflow: hidden;
+		z-index: -1;
+		pointer-events: none;
+	}
+	.orb {
+		position: absolute;
+		border-radius: 50%;
+		filter: blur(100px);
+		opacity: 0.28;
+		will-change: transform;
+	}
+	:global(html[data-theme='dark']) .orb {
+		opacity: 0.48;
+	}
+	.orb-a {
+		width: 500px;
+		height: 500px;
+		background: radial-gradient(circle, #ff7a00, transparent 68%);
+		top: -180px;
+		right: 6%;
+		animation: floatA 16s ease-in-out infinite;
+	}
+	.orb-b {
+		width: 400px;
+		height: 400px;
+		background: radial-gradient(circle, #ff3200, transparent 68%);
+		top: 60px;
+		left: -80px;
+		animation: floatB 20s ease-in-out infinite;
+	}
+	/* 마우스 스포트라이트 — 반경을 작게(안 퍼지게) */
+	.spot {
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(
+			200px circle at var(--mx, 70%) var(--my, 14%),
+			rgba(255, 122, 0, 0.14),
+			transparent 55%
+		);
+	}
+	@keyframes floatA {
+		0%,
+		100% {
+			transform: translate(0, 0) scale(1);
+		}
+		50% {
+			transform: translate(-40px, 35px) scale(1.1);
+		}
+	}
+	@keyframes floatB {
+		0%,
+		100% {
+			transform: translate(0, 0) scale(1);
+		}
+		50% {
+			transform: translate(40px, -25px) scale(1.05);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.orb {
+			animation: none;
+		}
+	}
+</style>
+<script>
+	const _amb = document.querySelector('.ambient');
+	if (_amb) {
+		window.addEventListener('pointermove', (e) => {
+			_amb.style.setProperty('--mx', `${e.clientX}px`);
+			_amb.style.setProperty('--my', `${e.clientY}px`);
+		});
+	}
+</script>
