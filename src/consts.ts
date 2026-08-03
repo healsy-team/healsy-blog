@@ -11,7 +11,7 @@ export const REPORT_URL = 'https://report.healsy.io/'; // 측정 리포트 웹
 export const WANTED_URL = 'https://www.wanted.co.kr/company/17877'; // 채용 — 원티드
 
 // About 페이지에서 GitHub API 로 프로필을 불러올 기여자들 (github 아이디)
-export const GITHUB_CONTRIBUTORS = ['Arc-Jung', 'corgi93'];
+export const GITHUB_CONTRIBUTORS = ['corgi93'];
 
 /**
  * giscus 댓글 설정 (https://giscus.app 에서 값 생성).
