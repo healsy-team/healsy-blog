@@ -70,6 +70,50 @@ About 페이지가 **GitHub API 를 빌드타임에 fetch** 해 프로필 카드
 - OG 이미지: `public/og-image.png`(로고 기반). `public/robots.txt` + `@astrojs/sitemap` 사용.
 - ⚠️ `astro.config.mjs` 의 `site` 가 배포 도메인의 source of truth (canonical·sitemap·OG URL 이 여기서 생성됨). **배포 도메인이 정해지면 반드시 교체하고 `robots.txt` 의 Sitemap URL 도 함께 수정.**
 
+## 방문자 통계
+
+두 갈래로 본다.
+
+**1. Vercel Web Analytics** — 유입경로 · 인기 글 · 기기 같은 상세 지표.
+`astro.config.mjs` 의 `vercel({ webAnalytics: { enabled: true } })` 가 스크립트를 주입한다.
+⚠️ **Vercel 대시보드에서 프로젝트 → Analytics 를 직접 켜야** 집계가 시작된다. 코드만으론 안 된다.
+
+**2. 자체 카운터** — 블로그에 노출되는 "오늘 / 전체 방문자".
+푸터 뱃지([Visitors.astro](src/components/Visitors.astro)) → 클릭하면 [/stats](src/pages/stats.astro) 로 간다.
+
+| 파일 | 역할 |
+| :-- | :-- |
+| `src/lib/counter.ts` | Redis 키 설계 · KST 날짜 · 지문 해싱 · 봇 판별 |
+| `src/pages/api/visit.ts` | POST 로 방문 1건 기록 → 오늘/전체 반환 |
+| `src/pages/api/stats.ts` | 최근 n일(최대 90) 일별 방문자·페이지뷰 |
+
+집계 규칙:
+
+- 하루는 **KST 기준**으로 자른다. (UTC 로 자르면 한국 새벽 트래픽이 전날로 붙는다)
+- 같은 사람이 하루에 여러 번 와도 **방문자는 1**, 페이지뷰는 매번 +1.
+- 중복 판별은 `IP + UA + 날짜 + salt` 의 SHA-256 해시. **IP 원본은 저장하지 않고**, 날짜가 섞여 있어 하루 지나면 같은 사람도 다른 값이 된다.
+- 검색엔진·프리뷰 봇은 UA 로 걸러 집계에서 뺀다. `robots.txt` 에서도 `/api/` 를 막아뒀다.
+
+### 환경변수 (Vercel)
+
+Upstash Redis 스토어를 하나 만들고 아래를 넣는다. Vercel 의 Upstash 통합을 쓰면 `KV_*` 로, Upstash 콘솔에서 직접 만들면 `UPSTASH_*` 로 들어오는데 **둘 다 읽는다.**
+
+```
+UPSTASH_REDIS_REST_URL=...      # 또는 KV_REST_API_URL
+UPSTASH_REDIS_REST_TOKEN=...    # 또는 KV_REST_API_TOKEN
+COUNTER_SALT=아무_긴_문자열       # 선택. 없으면 기본값 사용
+```
+
+환경변수가 없으면 — **프로덕션**은 `enabled: false` 로 응답하고 뱃지·차트를 조용히 숨긴다.
+**로컬 dev** 는 `counter.ts` 의 `demoDay()` 가 만든 데모 데이터를 보여준다 (`import.meta.env.DEV` 로만 열림).
+
+### 손볼 때 주의
+
+- **Astro 어댑터가 붙었다.** 페이지는 그대로 정적이고, `prerender = false` 를 선언한 `/api/*` 만 서버리스로 돈다. `output: 'static'` 을 바꾸면 전체가 SSR 로 넘어간다.
+- **`<style>` 스코프 함정** — Astro 의 scoped style 은 빌드 때 요소에 붙는 속성으로 동작한다. JS 가 `innerHTML` 로 만든 막대·눈금·표 행에는 그 속성이 없어서 스코프 규칙이 **적용되지 않는다.** 그래서 stats 페이지는 그 규칙들만 `<style is:global>` 에 두고 `.stats-chart` / `.stats-table` 루트로 범위를 좁혔다.
+- **차트 색은 검증을 통과한 값이다.** `--chart-1` 은 라이트 `#d95e00` · 다크 `#e07000` (`src/styles/global.css`). 다크는 밝기 밴드가 달라서 브랜드 오렌지 `#FF7A00` 을 그대로 쓰면 밴드를 벗어난다. 표면색이나 이 값을 바꿀 땐 `dataviz` skill 의 `validate_palette.js` 로 다시 검증한다.
+- POST `/api/visit` 은 Astro 의 CSRF 검사(`security.checkOrigin`)를 지난다. 브라우저는 same-origin POST 에도 `Origin` 을 붙이므로 통과하고, 혹시 막히면 클라이언트가 GET 으로 한 번 더 시도한다.
+
 ## 빌드 & 검증
 
 ```bash

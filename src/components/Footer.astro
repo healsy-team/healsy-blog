@@ -1,5 +1,6 @@
 ---
 import { WALTERWALKER_URL, REPORT_URL, WANTED_URL } from '../consts';
+import Visitors from './Visitors.astro';
 const today = new Date();
 ---
 
@@ -11,6 +12,7 @@ const today = new Date();
 		<a href={WANTED_URL} target="_blank" rel="noopener noreferrer">채용</a>
 		<a href="/rss.xml">RSS</a>
 	</div>
+	<Visitors />
 </footer>
 <style>
 	footer {

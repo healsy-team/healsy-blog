@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
+# 방문 카운터 엔드포인트 — 크롤러가 긁을 이유가 없다 (봇은 집계에서도 빠진다)
+Disallow: /api/
 
 Sitemap: https://healsy-blog.vercel.app/sitemap-index.xml

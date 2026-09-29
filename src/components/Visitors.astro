@@ -1,0 +1,77 @@
+---
+// 푸터 방문자 카운터. /api/visit 이 방문 1건을 기록하고 오늘/전체 수를 돌려준다.
+// 카운터가 꺼져 있으면(환경변수 없음) 아무것도 그리지 않는다.
+---
+
+<div class="visitors" data-visitors hidden>
+	<a href="/stats">
+		<span class="label">오늘</span>
+		<span class="value" data-today>–</span>
+		<span class="sep" aria-hidden="true">/</span>
+		<span class="label">전체</span>
+		<span class="value" data-total>–</span>
+	</a>
+</div>
+
+<script>
+	const box = document.querySelector<HTMLElement>('[data-visitors]');
+	if (box) {
+		const fmt = (n: number) => n.toLocaleString('ko-KR');
+		// Astro 의 CSRF 검사(security.checkOrigin)는 non-GET 에 Origin 헤더를 요구한다.
+		// 브라우저는 same-origin POST 에도 Origin 을 붙이지만, 혹시 막히면 GET 으로 한 번 더 시도한다.
+		const ping = async () => {
+			const post = await fetch('/api/visit', {
+				method: 'POST',
+				headers: { Accept: 'application/json' },
+			});
+			if (post.ok) return post.json();
+			const get = await fetch('/api/visit', { headers: { Accept: 'application/json' } });
+			return get.ok ? get.json() : null;
+		};
+		ping()
+			.then((data) => {
+				if (!data?.enabled) return;
+				box.querySelector('[data-today]')!.textContent = fmt(data.today ?? 0);
+				box.querySelector('[data-total]')!.textContent = fmt(data.total ?? 0);
+				box.hidden = false;
+				// /stats 페이지가 방금 기록된 이 한 건까지 반영할 수 있게 알려준다.
+				window.dispatchEvent(new CustomEvent('healsy:visit', { detail: data }));
+			})
+			.catch(() => {
+				/* 카운터가 죽어도 페이지는 멀쩡해야 한다 */
+			});
+	}
+</script>
+
+<style>
+	.visitors {
+		margin-top: 1.2em;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+	}
+	.visitors a {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.45em;
+		padding: 0.35em 0.8em;
+		border: 1px solid var(--outline);
+		border-radius: 999px;
+		background: var(--bg);
+		color: rgb(var(--gray));
+		text-decoration: none;
+	}
+	.visitors a:hover {
+		border-color: var(--chart-1);
+		color: rgb(var(--gray-dark));
+	}
+	.label {
+		letter-spacing: 0.04em;
+	}
+	.value {
+		color: rgb(var(--gray-dark));
+		font-variant-numeric: tabular-nums;
+	}
+	.sep {
+		opacity: 0.4;
+	}
+</style>
