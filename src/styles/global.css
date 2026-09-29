@@ -24,6 +24,10 @@
 	--accent-dark: #b84e00;
 	--code-fg: #b45309;
 
+	/* 차트 계열색 — dataviz 검증기(밝기 밴드·채도·표면 대비) 통과값. 표면색이 바뀌면 재검증. */
+	--chart-1: #d95e00;
+	--chart-grid: #e5e5ea;
+
 	--bg: #ffffff;
 	--surface: #f7f7f8;
 	--surface-2: #eeeef1;
@@ -44,6 +48,10 @@ html[data-theme='dark'] {
 	--accent: #ff7a00;
 	--accent-dark: #ff9a3d;
 	--code-fg: #ffcfa3;
+
+	/* 다크는 밝기 밴드(L 0.48–0.67)가 달라서 브랜드 오렌지를 그대로 못 쓴다 → 한 단계 낮춘 값. */
+	--chart-1: #e07000;
+	--chart-grid: #2a2a2e;
 
 	--bg: #060606;
 	--surface: #141416;

@@ -2,6 +2,7 @@
 
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
+import vercel from '@astrojs/vercel';
 import { defineConfig, fontProviders } from 'astro/config';
 
 // https://astro.build/config
@@ -9,6 +10,10 @@ export default defineConfig({
 	// TODO: 실제 배포 도메인으로 교체 (Vercel 배포 후 도메인, 예: https://blog.healsy.io)
 	//        RSS·사이트맵·canonical·og:image URL 이 이 값 기준으로 생성됨.
 	site: 'https://healsy-blog.vercel.app',
+	// 페이지는 전부 정적으로 빌드하고, `prerender = false` 를 선언한 /api/* 만 서버리스로 돈다.
+	// webAnalytics: Vercel Web Analytics 스크립트를 <head> 에 주입 (대시보드에서 Analytics 켜야 집계됨).
+	adapter: vercel({ webAnalytics: { enabled: true } }),
+	output: 'static',
 	integrations: [mdx(), sitemap()],
 	markdown: {
 		shikiConfig: {

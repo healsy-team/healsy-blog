@@ -1,0 +1,708 @@
+---
+// 방문 통계 페이지. 숫자는 전부 클라이언트에서 /api/stats 로 한 번만 받아오고(90일치),
+// 기간·지표 토글은 받아온 데이터를 잘라 쓰기 때문에 다시 요청하지 않는다.
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import Ambient from '../components/Ambient.astro';
+---
+
+<!doctype html>
+<html lang="ko">
+	<head>
+		<BaseHead title="Stats" description="Healsy Engineering 블로그 방문 통계 — 일별 방문자와 페이지뷰" />
+	</head>
+	<body>
+		<Ambient />
+		<Header />
+		<main>
+			<h1>Stats</h1>
+			<p class="lead">
+				이 블로그에 몇 명이 다녀갔는지 기록해요.<br />
+				하루는 한국 시간(KST) 기준으로 자르고, 같은 사람이 하루에 여러 번 와도 방문자는 1로 셉니다.<br />
+				검색엔진 봇은 집계에서 빼요.
+			</p>
+
+			<div class="notice" data-notice hidden></div>
+
+			<section class="figures" data-figures>
+				<div class="hero">
+					<div class="fig-label">전체 방문자</div>
+					<div class="hero-value" data-fig="total">–</div>
+					<div class="fig-sub">누적 · 일별 유니크 방문자의 합</div>
+				</div>
+				<div class="tiles">
+					<div class="tile">
+						<div class="fig-label">오늘</div>
+						<div class="tile-value" data-fig="today">–</div>
+						<div class="fig-sub" data-fig="today-date">&nbsp;</div>
+					</div>
+					<div class="tile">
+						<div class="fig-label">어제</div>
+						<div class="tile-value" data-fig="yesterday">–</div>
+						<div class="fig-sub" data-fig="yesterday-delta">&nbsp;</div>
+					</div>
+					<div class="tile">
+						<div class="fig-label">최근 7일</div>
+						<div class="tile-value" data-fig="week">–</div>
+						<div class="fig-sub" data-fig="week-avg">&nbsp;</div>
+					</div>
+					<div class="tile">
+						<div class="fig-label">전체 페이지뷰</div>
+						<div class="tile-value" data-fig="views">–</div>
+						<div class="fig-sub" data-fig="views-per">&nbsp;</div>
+					</div>
+				</div>
+			</section>
+
+			<div class="filters">
+				<div class="seg" role="group" aria-label="기간">
+					<button type="button" data-range="7">7일</button>
+					<button type="button" data-range="30" aria-pressed="true">30일</button>
+					<button type="button" data-range="90">90일</button>
+				</div>
+				<div class="seg" role="group" aria-label="지표">
+					<button type="button" data-metric="visitors" aria-pressed="true">방문자</button>
+					<button type="button" data-metric="views">페이지뷰</button>
+				</div>
+			</div>
+
+			<section class="card">
+				<h2 class="chart-title" data-chart-title>일별 방문자</h2>
+				<div class="chart stats-chart" data-chart aria-busy="true">
+					<div class="plot">
+						<div class="grid" data-grid></div>
+						<div
+							class="cols"
+							data-cols
+							tabindex="0"
+							role="group"
+							aria-label="일별 막대. 좌우 화살표로 날짜를 옮길 수 있어요."
+						></div>
+					</div>
+					<div class="xaxis" data-xaxis></div>
+					<div class="tip" data-tip hidden aria-hidden="true"></div>
+					<!-- 키보드로 막대를 옮길 때 스크린리더가 읽을 값 (툴팁은 시각용) -->
+					<p class="sr-only" data-readout aria-live="polite"></p>
+				</div>
+			</section>
+
+			<details class="table-view">
+				<summary>표로 보기</summary>
+				<div class="table-wrap stats-table">
+					<table>
+						<thead>
+							<tr><th scope="col">날짜</th><th scope="col">방문자</th><th scope="col">페이지뷰</th></tr>
+						</thead>
+						<tbody data-table></tbody>
+					</table>
+				</div>
+			</details>
+
+			<p class="foot-note">
+				상세 지표(유입경로 · 인기 글 · 기기)는 Vercel Web Analytics 대시보드에서 봐요.<br />
+				여기 숫자는 IP 를 저장하지 않고, IP·UA·날짜를 섞어 해시한 값으로만 중복을 걸러요.
+			</p>
+		</main>
+		<Footer />
+	</body>
+</html>
+
+<script>
+	type Point = { date: string; visitors: number; views: number };
+	type Stats = {
+		enabled: boolean;
+		demo?: boolean;
+		total?: number;
+		viewsTotal?: number;
+		series?: Point[];
+	};
+
+	const $ = <T extends Element>(sel: string) => document.querySelector<T>(sel)!;
+	const chart = $<HTMLElement>('[data-chart]');
+	const cols = $<HTMLElement>('[data-cols]');
+	const grid = $<HTMLElement>('[data-grid]');
+	const xaxis = $<HTMLElement>('[data-xaxis]');
+	const tip = $<HTMLElement>('[data-tip]');
+	const readout = $<HTMLElement>('[data-readout]');
+	const notice = $<HTMLElement>('[data-notice]');
+	const figures = $<HTMLElement>('[data-figures]');
+	const tbody = $<HTMLElement>('[data-table]');
+	const chartTitle = $<HTMLElement>('[data-chart-title]');
+
+	const fmt = (n: number) => n.toLocaleString('ko-KR');
+	const setFig = (key: string, text: string) => {
+		const el = document.querySelector(`[data-fig="${key}"]`);
+		if (el) el.textContent = text;
+	};
+
+	/** 'YYYY-MM-DD' → { md: '9/2', dow: '수' } (뷰어 타임존과 무관하게 계산) */
+	function label(date: string) {
+		const [y, m, d] = date.split('-').map(Number);
+		const dow = '일월화수목금토'[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+		return { md: `${m}/${d}`, dow };
+	}
+
+	/** y축 최댓값을 눈에 편한 수로 올림. 절반값도 정수로 떨어지게 고른다. */
+	function niceMax(v: number): number {
+		if (v <= 0) return 4;
+		if (v <= 10) return Math.max(2, Math.ceil(v / 2) * 2);
+		const base = 10 ** Math.floor(Math.log10(v));
+		for (const m of [1, 2, 3, 4, 5, 6, 8, 10]) {
+			if (m * base >= v) return m * base;
+		}
+		return 10 * base;
+	}
+
+	let all: Point[] = [];
+	let range = 30;
+	let metric: 'visitors' | 'views' = 'visitors';
+	let cursor = -1;
+
+	function render() {
+		const data = all.slice(-range);
+		if (!data.length) return;
+
+		const values = data.map((p) => p[metric]);
+		const top = niceMax(Math.max(...values));
+		const peak = Math.max(...values);
+		const lastIndex = data.length - 1;
+		const peakIndex = values.lastIndexOf(peak);
+
+		// 직접 라벨은 아껴서 — 최고점과 오늘만. 칸이 좁으면(90일) 라벨이 겹치니 아예 안 찍고
+		// 축·툴팁·표에 맡긴다. 최고점과 오늘이 붙어 있을 때도 최고점 하나만 남긴다.
+		const caps = new Set<number>();
+		if (data.length <= 31 && peak > 0) {
+			caps.add(peakIndex);
+			if (Math.abs(lastIndex - peakIndex) >= 3 && values[lastIndex]! > 0) caps.add(lastIndex);
+		}
+
+		// y축 눈금 3개 (0 · 절반 · 최대) — 하이라인 실선, 표면에서 한 단계만 다른 회색.
+		grid.innerHTML = [top, top / 2, 0]
+			.map(
+				(t, i) =>
+					`<div class="gridline" style="top:${(i / 2) * 100}%"><span>${fmt(t)}</span></div>`,
+			)
+			.join('');
+
+		// 막대 — 두께 24px 상한, 꼭대기만 4px 라운드, 사이는 2px 표면 간격.
+		cols.innerHTML = data
+			.map((p, i) => {
+				const v = p[metric];
+				const h = top ? (v / top) * 100 : 0;
+				return `<div class="col" id="col-${i}" aria-hidden="true">
+					<div class="stack" style="height:${h}%">
+						${caps.has(i) ? `<span class="cap">${fmt(v)}</span>` : ''}
+						<div class="bar"></div>
+					</div>
+				</div>`;
+			})
+			.join('');
+
+		// x축 라벨은 최대 5개만. 마지막(오늘)은 항상 찍는다.
+		const step = Math.max(1, Math.ceil(data.length / 5));
+		xaxis.innerHTML = data
+			.map((p, i) => {
+				const show = (lastIndex - i) % step === 0;
+				const text = i === lastIndex ? '오늘' : label(p.date).md;
+				return `<div class="xtick">${show ? text : ''}</div>`;
+			})
+			.join('');
+
+		chartTitle.textContent = metric === 'visitors' ? '일별 방문자' : '일별 페이지뷰';
+		chart.removeAttribute('aria-busy');
+
+		tbody.innerHTML = [...data]
+			.reverse()
+			.map((p) => {
+				const { dow } = label(p.date);
+				return `<tr><td>${p.date} (${dow})</td><td>${fmt(p.visitors)}</td><td>${fmt(p.views)}</td></tr>`;
+			})
+			.join('');
+
+		hideTip();
+	}
+
+	function renderFigures(stats: Stats) {
+		const series = all;
+		const today = series.at(-1)?.visitors ?? 0;
+		const yesterday = series.at(-2)?.visitors ?? 0;
+		const week = series.slice(-7).reduce((s, p) => s + p.visitors, 0);
+		const total = stats.total ?? 0;
+		const views = stats.viewsTotal ?? 0;
+
+		setFig('total', fmt(total));
+		setFig('today', fmt(today));
+		setFig('today-date', series.at(-1)?.date ?? '');
+		setFig('yesterday', fmt(yesterday));
+		const diff = today - yesterday;
+		setFig(
+			'yesterday-delta',
+			yesterday === 0 && today === 0 ? '아직 조용해요' : `오늘 ${diff >= 0 ? '+' : '−'}${fmt(Math.abs(diff))}`,
+		);
+		setFig('week', fmt(week));
+		setFig('week-avg', `하루 평균 ${(week / 7).toFixed(1)}명`);
+		setFig('views', fmt(views));
+		setFig('views-per', total ? `방문자당 ${(views / total).toFixed(1)}페이지` : ' ');
+	}
+
+	function showTip(i: number) {
+		const data = all.slice(-range);
+		const p = data[i];
+		const col = cols.children[i] as HTMLElement | undefined;
+		if (!p || !col) return;
+		const { md, dow } = label(p.date);
+		tip.innerHTML = `<div class="tip-date">${md} (${dow})</div>
+			<div class="tip-vals"><span>방문자 <b>${fmt(p.visitors)}</b></span><span>페이지뷰 <b>${fmt(p.views)}</b></span></div>`;
+		tip.hidden = false;
+		const area = chart.getBoundingClientRect();
+		const box = col.getBoundingClientRect();
+		const half = tip.offsetWidth / 2;
+		const x = box.left - area.left + box.width / 2;
+		tip.style.left = `${Math.min(Math.max(x, half), Math.max(area.width - half, half))}px`;
+		cols.querySelector('.col.is-active')?.classList.remove('is-active');
+		col.classList.add('is-active');
+		readout.textContent = `${md} ${dow}요일 방문자 ${fmt(p.visitors)}명, 페이지뷰 ${fmt(p.views)}`;
+		cursor = i;
+	}
+
+	function hideTip() {
+		tip.hidden = true;
+		cols.querySelector('.col.is-active')?.classList.remove('is-active');
+		readout.textContent = '';
+		cursor = -1;
+	}
+
+	cols.addEventListener('pointermove', (e) => {
+		const col = (e.target as HTMLElement).closest('.col');
+		if (col?.parentElement === cols) showTip([...cols.children].indexOf(col));
+	});
+	cols.addEventListener('pointerleave', hideTip);
+	cols.addEventListener('blur', hideTip);
+	cols.addEventListener('keydown', (e) => {
+		const n = cols.children.length;
+		if (!n) return;
+		const moves: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1 };
+		if (e.key in moves) {
+			const start = cursor < 0 ? n - 1 : cursor;
+			showTip(Math.min(Math.max(start + moves[e.key]!, 0), n - 1));
+			e.preventDefault();
+		} else if (e.key === 'Home') {
+			showTip(0);
+			e.preventDefault();
+		} else if (e.key === 'End') {
+			showTip(n - 1);
+			e.preventDefault();
+		} else if (e.key === 'Escape') {
+			hideTip();
+		}
+	});
+	cols.addEventListener('focus', () => {
+		if (cursor < 0 && cols.children.length) showTip(cols.children.length - 1);
+	});
+
+	function bindSeg(attr: 'range' | 'metric', apply: (value: string) => void) {
+		document.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`).forEach((btn) => {
+			btn.addEventListener('click', () => {
+				document
+					.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`)
+					.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+				apply(btn.dataset[attr]!);
+				render();
+			});
+		});
+	}
+	bindSeg('range', (v) => (range = Number(v)));
+	bindSeg('metric', (v) => (metric = v as typeof metric));
+
+	// 푸터 카운터가 방금 올린 방문 1건을 반영 (같은 로드에서 stats 응답이 먼저 왔을 수 있다).
+	window.addEventListener('healsy:visit', (e) => {
+		const d = (e as CustomEvent).detail as { today?: number; total?: number } | undefined;
+		const last = all.at(-1);
+		if (!d || !last) return;
+		last.visitors = Math.max(last.visitors, d.today ?? 0);
+		const el = document.querySelector('[data-fig="total"]');
+		const shown = Number(el?.textContent?.replace(/[^\d]/g, '') ?? 0);
+		if ((d.total ?? 0) > shown) setFig('total', fmt(d.total!));
+		setFig('today', fmt(last.visitors));
+		render();
+	});
+
+	fetch('/api/stats?days=90', { headers: { Accept: 'application/json' } })
+		.then((res) => (res.ok ? res.json() : null))
+		.then((stats: Stats | null) => {
+			if (!stats?.enabled) {
+				notice.textContent =
+					'카운터가 아직 연결되지 않았어요. Upstash Redis 환경변수를 붙이면 여기에 그려져요.';
+				notice.hidden = false;
+				figures.hidden = true;
+				chart.closest('.card')!.setAttribute('hidden', '');
+				document.querySelector('.filters')!.setAttribute('hidden', '');
+				document.querySelector('.table-view')!.setAttribute('hidden', '');
+				return;
+			}
+			if (stats.demo) {
+				notice.textContent =
+					'로컬 개발용 데모 데이터예요. Upstash 환경변수가 붙은 배포에서는 실제 수치가 보여요.';
+				notice.hidden = false;
+			}
+			all = stats.series ?? [];
+			renderFigures(stats);
+			render();
+		})
+		.catch(() => {
+			notice.textContent = '통계를 불러오지 못했어요. 잠시 뒤에 다시 시도해 주세요.';
+			notice.hidden = false;
+		});
+</script>
+
+<!--
+	차트 막대·눈금·툴팁 내용·표 행은 JS 가 innerHTML 로 만든다.
+	Astro 의 scoped style 은 빌드 때 요소에 붙는 속성으로 동작해서, 런타임에 생긴 요소에는
+	적용되지 않는다. 그래서 이 규칙들만 global 로 두고, 대신 `.stats-chart` / `.stats-table`
+	루트 아래로만 걸어서 다른 페이지로 새지 않게 한다.
+-->
+<style is:global>
+	.stats-chart .gridline {
+		position: absolute;
+		left: 0;
+		right: 0;
+		border-top: 1px solid var(--chart-grid);
+	}
+	.stats-chart .gridline span {
+		position: absolute;
+		right: calc(100% + 0.7em);
+		transform: translateY(-50%);
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-variant-numeric: tabular-nums;
+		color: rgb(var(--gray));
+	}
+	.stats-chart .col {
+		position: relative;
+		flex: 1 1 0;
+		min-width: 0;
+		height: 100%;
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		cursor: default;
+	}
+	/* 막대 높이를 감싸는 래퍼 — cap(직접 라벨)을 막대 꼭대기 바로 위에 얹기 위해 필요하다. */
+	.stats-chart .stack {
+		position: relative;
+		z-index: 1;
+		width: 100%;
+		max-width: 24px;
+	}
+	.stats-chart .bar {
+		width: 100%;
+		height: 100%;
+		background: var(--chart-1);
+		/* 데이터 끝만 라운드, 베이스라인은 각지게 */
+		border-radius: 4px 4px 0 0;
+		transition: opacity 0.12s ease;
+	}
+	.stats-chart .col.is-active .bar {
+		opacity: 0.72;
+	}
+	/* 호버 표시는 칸 전체를 살짝 밝히는 것으로 — 막대에 테두리를 그리지 않는다. */
+	.stats-chart .col.is-active::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: var(--surface-2);
+		border-radius: 4px;
+		z-index: 0;
+	}
+	.stats-chart .cap {
+		position: absolute;
+		bottom: 100%;
+		left: 50%;
+		transform: translate(-50%, -0.25em);
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-variant-numeric: tabular-nums;
+		color: rgb(var(--gray-dark));
+		white-space: nowrap;
+	}
+	.stats-chart .xtick {
+		flex: 1 1 0;
+		min-width: 0;
+		text-align: center;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-variant-numeric: tabular-nums;
+		color: rgb(var(--gray));
+		white-space: nowrap;
+	}
+	.stats-chart .tip-date {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: rgb(var(--gray));
+		margin-bottom: 0.3em;
+	}
+	.stats-chart .tip-vals {
+		display: flex;
+		gap: 1em;
+		color: rgb(var(--gray));
+	}
+	.stats-chart .tip-vals b {
+		color: rgb(var(--black));
+		font-variant-numeric: tabular-nums;
+	}
+	.stats-table td {
+		padding: 0.55em 0.9em;
+		text-align: right;
+		border-bottom: 1px solid var(--outline);
+		font-variant-numeric: tabular-nums;
+		color: rgb(var(--gray-dark));
+	}
+	.stats-table td:first-child {
+		text-align: left;
+	}
+	.stats-table tbody tr:last-child td {
+		border-bottom: 0;
+	}
+</style>
+
+<style>
+	main {
+		width: 820px;
+		max-width: calc(100% - 2em);
+		margin: auto;
+		padding: 3em 1em;
+	}
+	h1 {
+		font-family: var(--font-display);
+		font-size: 2.4rem;
+		margin: 0 0 0.5em;
+	}
+	.lead {
+		color: rgb(var(--gray));
+		line-height: 1.8;
+		margin: 0 0 2.4em;
+	}
+
+	.notice {
+		padding: 1em 1.2em;
+		border: 1px solid var(--outline);
+		border-radius: 12px;
+		background: var(--surface);
+		color: rgb(var(--gray));
+		font-size: 0.92rem;
+		margin-bottom: 2em;
+	}
+
+	/* ── 숫자 영역 ── */
+	.figures {
+		display: grid;
+		grid-template-columns: minmax(220px, 1fr) 2fr;
+		gap: 1em;
+		margin-bottom: 2.4em;
+	}
+	.hero {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+	.hero,
+	.tile {
+		padding: 1.2em 1.3em;
+		border: 1px solid var(--outline);
+		border-radius: 14px;
+		background: var(--surface);
+	}
+	.tiles {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 1em;
+	}
+	.fig-label {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: rgb(var(--gray));
+	}
+	.hero-value {
+		/* 히어로 숫자는 본문과 같은 sans, 비례 숫자(tabular 아님). */
+		font-size: 3.4rem;
+		font-weight: 600;
+		line-height: 1.1;
+		margin: 0.15em 0 0.2em;
+		color: rgb(var(--black));
+	}
+	.tile-value {
+		font-size: 1.7rem;
+		font-weight: 600;
+		line-height: 1.2;
+		margin: 0.1em 0 0.15em;
+		color: rgb(var(--black));
+	}
+	.fig-sub {
+		font-size: 0.78rem;
+		color: rgb(var(--gray));
+	}
+
+	/* ── 필터 (차트 카드 밖, 한 줄) ── */
+	.filters {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6em;
+		margin-bottom: 0.9em;
+	}
+	.seg {
+		display: inline-flex;
+		border: 1px solid var(--outline);
+		border-radius: 10px;
+		overflow: hidden;
+		background: var(--surface);
+	}
+	.seg button {
+		appearance: none;
+		border: 0;
+		background: transparent;
+		padding: 0.45em 0.9em;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: rgb(var(--gray));
+		cursor: pointer;
+	}
+	.seg button + button {
+		border-left: 1px solid var(--outline);
+	}
+	.seg button:hover {
+		color: rgb(var(--gray-dark));
+	}
+	.seg button[aria-pressed='true'] {
+		background: var(--surface-2);
+		color: rgb(var(--black));
+	}
+
+	/* ── 차트 ── */
+	.card {
+		padding: 1.4em 1.5em 1.2em;
+		border: 1px solid var(--outline);
+		border-radius: 14px;
+		background: var(--surface);
+	}
+	.chart-title {
+		font-family: var(--font-display);
+		font-size: 1rem;
+		font-weight: 600;
+		/* 아래 여백은 툴팁이 앉을 자리 — 툴팁이 막대를 덮지 않도록 비워둔다. */
+		margin: 0 0 3em;
+		color: rgb(var(--black));
+	}
+	/* 높이를 고정하지 않고 plot + x축이 각자 자리를 차지하게 둔다 (축이 잘리지 않도록) */
+	.chart {
+		position: relative;
+	}
+	.plot {
+		position: relative;
+		height: 220px;
+		padding-left: 3.2em;
+	}
+	.grid {
+		position: absolute;
+		inset: 0 0 0 3.2em;
+		pointer-events: none;
+	}
+	.cols {
+		position: relative;
+		display: flex;
+		align-items: flex-end;
+		gap: 2px;
+		height: 100%;
+		outline: none;
+	}
+	.xaxis {
+		display: flex;
+		gap: 2px;
+		margin-top: 0.6em;
+		min-height: 1.2em;
+		padding-left: 3.2em;
+	}
+	.tip {
+		position: absolute;
+		bottom: calc(100% + 0.5em);
+		transform: translateX(-50%);
+		white-space: nowrap;
+		padding: 0.5em 0.7em;
+		border: 1px solid var(--outline);
+		border-radius: 10px;
+		background: var(--bg);
+		box-shadow: var(--box-shadow);
+		font-size: 0.78rem;
+		pointer-events: none;
+		z-index: 2;
+	}
+	.cols:focus-visible {
+		box-shadow: 0 0 0 2px var(--chart-1);
+		border-radius: 4px;
+	}
+
+	/* ── 표 ── */
+	.table-view {
+		margin-top: 1.6em;
+	}
+	.table-view summary {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: rgb(var(--gray));
+		cursor: pointer;
+	}
+	.table-wrap {
+		max-height: 340px;
+		overflow: auto;
+		margin-top: 0.9em;
+		border: 1px solid var(--outline);
+		border-radius: 12px;
+	}
+	table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.85rem;
+	}
+	/* td 는 JS 가 만들기 때문에 위 global 블록에서 처리한다. */
+	th {
+		padding: 0.55em 0.9em;
+		text-align: right;
+		border-bottom: 1px solid var(--outline);
+		position: sticky;
+		top: 0;
+		background: var(--surface);
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: rgb(var(--gray));
+	}
+	th:first-child {
+		text-align: left;
+	}
+
+	.foot-note {
+		margin-top: 2.4em;
+		font-size: 0.8rem;
+		line-height: 1.8;
+		color: rgb(var(--gray));
+	}
+
+	@media (max-width: 680px) {
+		.figures {
+			grid-template-columns: 1fr;
+		}
+		.hero-value {
+			font-size: 2.8rem;
+		}
+		.plot,
+		.xaxis {
+			padding-left: 2.6em;
+		}
+		.grid {
+			inset: 0 0 0 2.6em;
+		}
+	}
+</style>
